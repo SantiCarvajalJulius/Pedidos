@@ -37,6 +37,8 @@ carpetas_tablas = {
     'jcom1': ('t_temp_seller_pedidos_jcom', 't_seller_pedidos_jcom')
 }
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 # === CREAR CARPETAS SI NO EXISTEN ===
 # Crea las subcarpetas de datos (jcom1, jcom2) para evitar omitirlas
 for subcarpeta in carpetas_tablas.keys():
