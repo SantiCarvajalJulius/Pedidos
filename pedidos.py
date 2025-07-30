@@ -12,6 +12,8 @@ MYSQL_USER = os.getenv("MYSQL_USER")
 MYSQL_PASSWORD = os.getenv("MYSQL_PASSWORD")
 MYSQL_DATABASE = os.getenv("MYSQL_DATABASE")
 
+os.environ['OPENBLAS_NUM_THREADS'] = '4'
+
 # Conexión a la base de datos MySQL
 conexion = mysql.connector.connect(
     host=MYSQL_HOST,
