@@ -1,0 +1,31 @@
+UPDATE `{tabla_final}` f
+        INNER JOIN `{tabla_temp}` t ON f.indicemd5 = t.indicemd5
+        SET f.purchase_date = t.purchase_date,
+            f.last_updated_date = t.last_updated_date,
+            f.order_status = t.order_status,
+            f.ship_service_level = t.ship_service_level,
+            f.number_of_items = t.number_of_items,
+            f.item_status = t.item_status,
+            f.quantity = t.quantity,
+            f.item_price = t.item_price,
+            f.item_tax = t.item_tax,
+            f.shipping_price = t.shipping_price,
+            f.shipping_tax = t.shipping_tax,
+            f.gift_wrap_price = t.gift_wrap_price,
+            f.gift_wrap_tax = t.gift_wrap_tax,
+            f.item_promotion_discount = t.item_promotion_discount,
+            f.ship_promotion_discount = t.ship_promotion_discount,
+            f.is_business_order = t.is_business_order,
+            f.is_heavy_or_bulky = t.is_heavy_or_bulky,
+            f.is_replacement_order = t.is_replacement_order,
+            f.is_exchange_order = t.is_exchange_order,
+            f.is_amazon_invoiced = t.is_amazon_invoiced,
+            f.vat_exclusive_item_price = t.vat_exclusive_item_price,
+            f.vat_exclusive_giftwrap_price = t.vat_exclusive_giftwrap_price,
+            f.is_iba = t.is_iba,
+            f.is_transparency = t.is_transparency,
+            f.is_buyer_requested_cancellation = t.is_buyer_requested_cancellation,
+            f.is_ispu_order = t.is_ispu_order,
+            f.is_pickup_point_order = t.is_pickup_point_order
+        WHERE f.indicemd5 = t.indicemd5;
+    

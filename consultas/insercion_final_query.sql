@@ -1,0 +1,46 @@
+INSERT INTO `{tabla_final}` (
+    `amazon_order_id`, `merchant_order_id`, `purchase_date`, `last_updated_date`, 
+    `order_status`, `fulfillment_channel`, `sales_channel`, `order_channel`, `url`, 
+    `ship_service_level`, `product_name`, `sku`, `asin`, `number_of_items`, `item_status`, 
+    `tax_collection_model`, `tax_collection_responsible_party`, `quantity`, `currency`, 
+    `item_price`, `item_tax`, `shipping_price`, `shipping_tax`, `gift_wrap_price`, 
+    `gift_wrap_tax`, `item_promotion_discount`, `ship_promotion_discount`, `ship_city`, 
+    `ship_state`, `ship_postal_code`, `ship_country`, `promotion_ids`, `payment_method_details`, 
+    `item_extensions_data`, `is_business_order`, `purchase_order_number`, `price_designation`, 
+    `fulfilled_by`, `buyer_company_name`, `buyer_cst_number`, `buyer_vat_number`, 
+    `buyer_tax_registration_id`, `buyer_tax_registration_country`, `buyer_tax_registration_type`, 
+    `customized_url`, `customized_page`, `is_heavy_or_bulky`, `is_replacement_order`, 
+    `is_exchange_order`, `original_order_id`, `is_amazon_invoiced`, `vat_exclusive_item_price`, 
+    `vat_exclusive_shipping_price`, `vat_exclusive_giftwrap_price`, `licensee_name`, 
+    `license_number`, `license_state`, `license_expiration_date`, `is_iba`, `is_transparency`, 
+    `default_ship_from_address_name`, `default_ship_from_address_field_1`, 
+    `default_ship_from_address_field_2`, `default_ship_from_address_field_3`, 
+    `default_ship_from_city`, `default_ship_from_state`, `default_ship_from_country`, 
+    `default_ship_from_postal_code`, `is_ispu_order`, `store_chain_store_id`, 
+    `is_pickup_point_order`, `pickup_point_type`, `is_buyer_requested_cancellation`, 
+    `buyer_requested_cancel_reason`, `indice`, `indicemd5`, `fecha_add`, `fecha_update`
+) 
+SELECT 
+    t.`amazon_order_id`, t.`merchant_order_id`, t.`purchase_date`, t.`last_updated_date`, 
+    t.`order_status`, t.`fulfillment_channel`, t.`sales_channel`, t.`order_channel`, t.`url`, 
+    t.`ship_service_level`, t.`product_name`, t.`sku`, t.`asin`, t.`number_of_items`, t.`item_status`, 
+    t.`tax_collection_model`, t.`tax_collection_responsible_party`, t.`quantity`, t.`currency`, 
+    t.`item_price`, t.`item_tax`, t.`shipping_price`, t.`shipping_tax`, t.`gift_wrap_price`, 
+    t.`gift_wrap_tax`, t.`item_promotion_discount`, t.`ship_promotion_discount`, t.`ship_city`, 
+    t.`ship_state`, t.`ship_postal_code`, t.`ship_country`, t.`promotion_ids`, t.`payment_method_details`, 
+    t.`item_extensions_data`, t.`is_business_order`, t.`purchase_order_number`, t.`price_designation`, 
+    t.`fulfilled_by`, t.`buyer_company_name`, t.`buyer_cst_number`, t.`buyer_vat_number`, 
+    t.`buyer_tax_registration_id`, t.`buyer_tax_registration_country`, t.`buyer_tax_registration_type`, 
+    t.`customized_url`, t.`customized_page`, t.`is_heavy_or_bulky`, t.`is_replacement_order`, 
+    t.`is_exchange_order`, t.`original_order_id`, t.`is_amazon_invoiced`, t.`vat_exclusive_item_price`, 
+    t.`vat_exclusive_shipping_price`, t.`vat_exclusive_giftwrap_price`, t.`licensee_name`, 
+    t.`license_number`, t.`license_state`, t.`license_expiration_date`, t.`is_iba`, t.`is_transparency`, 
+    t.`default_ship_from_address_name`, t.`default_ship_from_address_field_1`, 
+    t.`default_ship_from_address_field_2`, t.`default_ship_from_address_field_3`, 
+    t.`default_ship_from_city`, t.`default_ship_from_state`, t.`default_ship_from_country`, 
+    t.`default_ship_from_postal_code`, t.`is_ispu_order`, t.`store_chain_store_id`, 
+    t.`is_pickup_point_order`, t.`pickup_point_type`, t.`is_buyer_requested_cancellation`, 
+    t.`buyer_requested_cancel_reason`, t.`indice`, t.`indicemd5`, t.`fecha_add`, t.`fecha_update`
+FROM `{tabla_temp}` t
+LEFT JOIN `{tabla_final}` f ON t.indicemd5 = f.indicemd5
+WHERE f.indicemd5 IS NULL;
