@@ -31,6 +31,12 @@ carpetas_tablas = {
     'jcom1': ('t_temp_seller_pedidos_jcom', 't_seller_pedidos_jcom')
 }
 
+# === CREAR CARPETAS SI NO EXISTEN ===
+# Crea las subcarpetas de datos (jcom1, jcom2) para evitar omitirlas
+for subcarpeta in carpetas_tablas.keys():
+    os.makedirs(os.path.join(BASE_DIR, subcarpeta), exist_ok=True)
+
+
 # Función para verificar y crear tabla si no existe
 def crear_tabla_si_no_existe(nombre_tabla, tipo):
     cursor.execute(f"SHOW TABLES LIKE '{nombre_tabla}'")
