@@ -1,20 +1,28 @@
 import os
+import logging
 
+# Limitar threads
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
-os.environ["OMP_NUM_THREADS"] = "1"
-os.environ["MKL_NUM_THREADS"] = "1"
-os.environ["NUMEXPR_NUM_THREADS"] = "1"
+os.environ["OMP_NUM_THREADS"]      = "1"
+os.environ["MKL_NUM_THREADS"]      = "1"
+os.environ["NUMEXPR_NUM_THREADS"]  = "1"
 
 import pandas as pd
 import mysql.connector
 from dotenv import load_dotenv
 
-# Cargar variables de entorno desde el archivo .env
-load_dotenv()
+# ——— Configuración de logging ———
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s:%(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
+)
+logger = logging.getLogger(__name__)
 
-# Obtener los datos de conexión desde las variables de entorno
-MYSQL_HOST = os.getenv("MYSQL_HOST")
-MYSQL_USER = os.getenv("MYSQL_USER")
+# Cargar variables de entorno
+load_dotenv()
+MYSQL_HOST     = os.getenv("MYSQL_HOST")
+MYSQL_USER     = os.getenv("MYSQL_USER")
 MYSQL_PASSWORD = os.getenv("MYSQL_PASSWORD")
 MYSQL_DATABASE = os.getenv("MYSQL_DATABASE")
 
@@ -28,117 +36,97 @@ conexion = mysql.connector.connect(
 )
 cursor = conexion.cursor()
 
-# Ruta a la carpeta con las consultas
+# Rutas y diccionario de carpetas/tablas
 carpeta_consultas = 'consultas'
-
-# Diccionario de carpetas y tablas
 carpetas_tablas = {
     'jcom2': ('t_temp_seller_pedidos_jcom2', 't_seller_pedidos_jcom2'),
-    'jcom1': ('t_temp_seller_pedidos_jcom', 't_seller_pedidos_jcom')
+    'jcom1': ('t_temp_seller_pedidos_jcom',  't_seller_pedidos_jcom')
 }
-
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# === CREAR CARPETAS SI NO EXISTEN ===
-# Crea las subcarpetas de datos (jcom1, jcom2) para evitar omitirlas
-for subcarpeta in carpetas_tablas.keys():
-    os.makedirs(os.path.join(BASE_DIR, subcarpeta), exist_ok=True)
+# Crear subcarpetas si no existen
+for subcarpeta in carpetas_tablas:
+    path = os.path.join(BASE_DIR, subcarpeta)
+    os.makedirs(path, exist_ok=True)
+    logger.info(f"Existe o fue creada la carpeta: {path}")
 
-
-# Función para verificar y crear tabla si no existe
 def crear_tabla_si_no_existe(nombre_tabla, tipo):
     cursor.execute(f"SHOW TABLES LIKE '{nombre_tabla}'")
-    resultado = cursor.fetchone()
-
-    if not resultado:
-        print(f"La tabla '{nombre_tabla}' no existe, creando...")
-
-        if tipo == 'temp':
-            ruta_sql = os.path.join(carpeta_consultas, 'create_temp_table.sql')
-        else:
-            ruta_sql = os.path.join(carpeta_consultas, 'create_final_table.sql')
-
-        with open(ruta_sql, 'r') as file:
-            sql_creacion = file.read().format(tabla=nombre_tabla)
-
-        cursor.execute(sql_creacion)
+    if not cursor.fetchone():
+        logger.info(f"La tabla '{nombre_tabla}' no existe, creando...")
+        sql_file = 'create_temp_table.sql' if tipo=='temp' else 'create_final_table.sql'
+        ruta_sql = os.path.join(carpeta_consultas, sql_file)
+        with open(ruta_sql, 'r') as f:
+            sql = f.read().format(tabla=nombre_tabla)
+        cursor.execute(sql)
         conexion.commit()
-        print(f"Tabla '{nombre_tabla}' creada.")
+        logger.info(f"Tabla '{nombre_tabla}' creada.")
     else:
-        print(f"La tabla '{nombre_tabla}' ya existe.")
+        logger.info(f"Tabla '{nombre_tabla}' ya existe.")
 
-# Recorrer cada carpeta en el diccionario
+# Procesamiento de archivos
 for subcarpeta, (tabla_temp, tabla_final) in carpetas_tablas.items():
 
-    # Crear tablas si no existen
-    crear_tabla_si_no_existe(tabla_temp, tipo='temp')
-    crear_tabla_si_no_existe(tabla_final, tipo='final')
+    # Asegurar tablas
+    crear_tabla_si_no_existe(tabla_temp, 'temp')
+    crear_tabla_si_no_existe(tabla_final, 'final')
 
-    # Verificar si la carpeta existe y tiene archivos TXT
-    if os.path.exists(subcarpeta) and os.listdir(subcarpeta):
-        archivos_txt = [archivo for archivo in os.listdir(subcarpeta) if archivo.endswith('.txt')]
+    carpeta = os.path.join(BASE_DIR, subcarpeta)
+    archivos_txt = [f for f in os.listdir(carpeta) if f.endswith('.txt')]
 
-        for archivo_txt in archivos_txt:
+    for archivo_txt in archivos_txt:
+        ruta_archivo = os.path.join(carpeta, archivo_txt)
+        try:
+            # 1) Leer TXT
+            df = pd.read_csv(ruta_archivo, sep='\t', engine='python')
+            logger.info(f"Leído '{archivo_txt}' en '{subcarpeta}' ({len(df)} filas).")
+
+            # 2) Eliminar datos antiguos de tabla temporal
+            with open(os.path.join(carpeta_consultas, 'delete_query.sql')) as f:
+                query = f.read().format(tabla_temp=tabla_temp)
+            cursor.execute(query); conexion.commit()
+            logger.info(f"Datos anteriores borrados en '{tabla_temp}'.")
+
+            # 3) Insertar en tabla temporal
+            ruta_mysql = os.path.abspath(ruta_archivo).replace("\\", "/")
+            with open(os.path.join(carpeta_consultas, 'insercion_query.sql')) as f:
+                query = f.read().format(ruta_completa_mysql=ruta_mysql, tabla_temp=tabla_temp)
+            cursor.execute(query); conexion.commit()
+            logger.info(f"Datos de '{archivo_txt}' cargados en '{tabla_temp}'.")
+
+            # 4) Actualizar 'indice'
+            with open(os.path.join(carpeta_consultas, 'update_indice_query.sql')) as f:
+                cursor.execute(f.read().format(tabla_temp=tabla_temp)); conexion.commit()
+            logger.info(f"Columna 'indice' actualizada en '{tabla_temp}'.")
+
+            # 5) Actualizar 'indicemd5'
+            with open(os.path.join(carpeta_consultas, 'update_md5_query.sql')) as f:
+                cursor.execute(f.read().format(tabla_temp=tabla_temp)); conexion.commit()
+            logger.info(f"Columna 'indicemd5' actualizada en '{tabla_temp}'.")
+
+            # 6) Insertar en tabla final
+            with open(os.path.join(carpeta_consultas, 'insercion_final_query.sql')) as f:
+                cursor.execute(f.read().format(tabla_temp=tabla_temp, tabla_final=tabla_final)); conexion.commit()
+            logger.info(f"Nuevos datos insertados en '{tabla_final}'.")
+
+            # 7) Actualizar datos en tabla final
+            with open(os.path.join(carpeta_consultas, 'update_final_query.sql')) as f:
+                cursor.execute(f.read().format(tabla_temp=tabla_temp, tabla_final=tabla_final)); conexion.commit()
+            logger.info(f"Datos actualizados en '{tabla_final}' desde '{tabla_temp}'.")
+
+        except pd.errors.ParserError as e:
+            logger.error(f"ParserError en '{archivo_txt}': {e}")
+        except Exception as e:
+            logger.error(f"Error procesando '{archivo_txt}': {e}")
+        else:
+            # Elimina el archivo solo si no hubo excepción
             try:
-                # Ruta completa del archivo
-                ruta_archivo = os.path.join(subcarpeta, archivo_txt)
-                
-                # Leer el archivo TXT delimitado por tabulaciones
-                df = pd.read_csv(ruta_archivo, sep='\t', engine='python')
-                
-                print(f"Archivo '{archivo_txt}' procesado en '{subcarpeta}'.")
-
-                # Asegurar que la ruta sea absoluta para MySQL
-                ruta_completa_mysql = os.path.abspath(ruta_archivo).replace("\\", "/")
-
-                # Leer y ejecutar la consulta de eliminar datos antiguos en la tabla temporal
-                with open(os.path.join(carpeta_consultas, 'delete_query.sql'), 'r') as file:
-                    delete_query = file.read().format(tabla_temp=tabla_temp)
-                cursor.execute(delete_query)
-                conexion.commit()
-                print(f"Datos anteriores eliminados de la tabla temporal '{tabla_temp}'.")
-
-                # Leer y ejecutar la consulta de inserción en la tabla temporal
-                with open(os.path.join(carpeta_consultas, 'insercion_query.sql'), 'r') as file:
-                    insercion = file.read().format(ruta_completa_mysql=ruta_completa_mysql, tabla_temp=tabla_temp)
-                cursor.execute(insercion)
-                conexion.commit()
-                print(f"Datos del archivo '{archivo_txt}' insertados en la tabla temporal '{tabla_temp}'.")
-
-                # Leer y ejecutar la consulta de actualización de la columna 'indice'
-                with open(os.path.join(carpeta_consultas, 'update_indice_query.sql'), 'r') as file:
-                    update_indice = file.read().format(tabla_temp=tabla_temp)
-                cursor.execute(update_indice)
-                conexion.commit()
-                print(f"Columna 'indice' actualizada en '{tabla_temp}'.")
-
-                # Leer y ejecutar la consulta de actualización de la columna 'indicemd5'
-                with open(os.path.join(carpeta_consultas, 'update_md5_query.sql'), 'r') as file:
-                    update_md5 = file.read().format(tabla_temp=tabla_temp)
-                cursor.execute(update_md5)
-                conexion.commit()
-                print(f"Columna 'indicemd5' actualizada en '{tabla_temp}'.")
-
-                # Leer y ejecutar la consulta de inserción de datos nuevos en la tabla final
-                with open(os.path.join(carpeta_consultas, 'insercion_final_query.sql'), 'r') as file:
-                    insercion_final = file.read().format(tabla_temp=tabla_temp, tabla_final=tabla_final)
-                cursor.execute(insercion_final)
-                conexion.commit()
-                print(f"Datos nuevos insertados en '{tabla_final}' desde '{tabla_temp}'.")
-
-                # Leer y ejecutar la consulta de actualización de los datos en la tabla final
-                with open(os.path.join(carpeta_consultas, 'update_final_query.sql'), 'r') as file:
-                    update_final = file.read().format(tabla_temp=tabla_temp, tabla_final=tabla_final)
-                cursor.execute(update_final)
-                conexion.commit()
-                print(f"Datos actualizados en la tabla final '{tabla_final}'.")
-
-            except pd.errors.ParserError as e:
-                print(f"Error de formato en el archivo '{archivo_txt}' en '{subcarpeta}': {str(e)}")
+                os.remove(ruta_archivo)
+                logger.info(f"Archivo eliminado: '{ruta_archivo}'.")
             except Exception as e:
-                print(f"Error al procesar el archivo '{archivo_txt}' en '{subcarpeta}': {str(e)}")
-                continue
+                logger.error(f"No se pudo borrar '{ruta_archivo}': {e}")
 
 # Cerrar conexión
 cursor.close()
 conexion.close()
+logger.info("Conexión MySQL cerrada y proceso finalizado.")
